@@ -37,6 +37,8 @@ def model_provider():
         num_tokentypes=2,
         add_binary_head=True,
         parallel_output=True)
+    
+    print(model)
 
     return model
 

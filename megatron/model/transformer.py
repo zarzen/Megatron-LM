@@ -62,10 +62,14 @@ class ParallelMLP(MegatronModule):
         args = get_args()
 
         # Project to 4h.
-        self.dense_h_to_4h = mpu.ColumnParallelLinear(
+        # self.dense_h_to_4h = mpu.ColumnParallelLinear(
+        #     args.hidden_size,
+        #     4 * args.hidden_size,
+        #     gather_output=False,
+        #     init_method=init_method)
+        self.dense_h_to_4h = mpu.RowParallelLinear(
             args.hidden_size,
             4 * args.hidden_size,
-            gather_output=False,
             init_method=init_method)
 
         self.activation_func = mlp_activation_func
@@ -121,11 +125,16 @@ class ParallelSelfAttention(MegatronModule):
             args.num_attention_heads, world_size)
 
         # Strided linear layer.
-        self.query_key_value = mpu.ColumnParallelLinear(
+        # self.query_key_value = mpu.ColumnParallelLinear(
+        #     args.hidden_size,
+        #     3 * args.hidden_size,
+        #     stride=3,
+        #     gather_output=False,
+        #     init_method=init_method)
+        self.query_key_value = mpu.RowParallelLinear(
             args.hidden_size,
             3 * args.hidden_size,
             stride=3,
-            gather_output=False,
             init_method=init_method)
 
         # Dropout. Note that for a single iteration, this layer will generate
