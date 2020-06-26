@@ -78,7 +78,7 @@ class ParallelMLP(MegatronModule):
         self.dense_4h_to_h = mpu.RowParallelLinear(
             4 * args.hidden_size,
             args.hidden_size,
-            input_is_parallel=True,
+            # input_is_parallel=True,
             init_method=output_layer_init_method)
 
         self.dropout = torch.nn.Dropout(args.hidden_dropout)
@@ -125,17 +125,17 @@ class ParallelSelfAttention(MegatronModule):
             args.num_attention_heads, world_size)
 
         # Strided linear layer.
-        # self.query_key_value = mpu.ColumnParallelLinear(
-        #     args.hidden_size,
-        #     3 * args.hidden_size,
-        #     stride=3,
-        #     gather_output=False,
-        #     init_method=init_method)
-        self.query_key_value = mpu.RowParallelLinear(
+        self.query_key_value = mpu.ColumnParallelLinear(
             args.hidden_size,
             3 * args.hidden_size,
             stride=3,
+            gather_output=False,
             init_method=init_method)
+        # self.query_key_value = mpu.RowParallelLinear(
+        #     args.hidden_size,
+        #     3 * args.hidden_size,
+        #     stride=3,
+        #     init_method=init_method)
 
         # Dropout. Note that for a single iteration, this layer will generate
         # different outputs on different number of parallel partitions but
