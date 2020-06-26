@@ -62,23 +62,23 @@ class ParallelMLP(MegatronModule):
         args = get_args()
 
         # Project to 4h.
-        # self.dense_h_to_4h = mpu.ColumnParallelLinear(
-        #     args.hidden_size,
-        #     4 * args.hidden_size,
-        #     gather_output=False,
-        #     init_method=init_method)
-        self.dense_h_to_4h = mpu.RowParallelLinear(
+        self.dense_h_to_4h = mpu.ColumnParallelLinear(
             args.hidden_size,
             4 * args.hidden_size,
+            gather_output=True,
             init_method=init_method)
 
         self.activation_func = mlp_activation_func
 
         # Project back to h.
-        self.dense_4h_to_h = mpu.RowParallelLinear(
+        # self.dense_4h_to_h = mpu.RowParallelLinear(
+        #     4 * args.hidden_size,
+        #     args.hidden_size,
+        #     # input_is_parallel=True,
+        #     init_method=output_layer_init_method)
+        self.dense_4h_to_h = mpu.ColumnParallelLinear(
             4 * args.hidden_size,
             args.hidden_size,
-            # input_is_parallel=True,
             init_method=output_layer_init_method)
 
         self.dropout = torch.nn.Dropout(args.hidden_dropout)
