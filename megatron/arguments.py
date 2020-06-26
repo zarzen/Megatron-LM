@@ -22,7 +22,8 @@ import os
 def parse_args(extra_args_provider=None, defaults={},
                ignore_unknown_args=False):
     """Parse all arguments."""
-    parser = argparse.ArgumentParser(description='Megatron-LM Arguments')
+    parser = argparse.ArgumentParser(description='Megatron-LM Arguments',
+                                     allow_abbrev=False)
 
     # Standard arguments.
     parser = _add_network_size_args(parser)
@@ -47,21 +48,6 @@ def parse_args(extra_args_provider=None, defaults={},
     else:
         args = parser.parse_args()
 
-    # Set input defaults.
-    for key in defaults:
-        # For default to be valid, it should not be provided in the
-        # arguments that are passed to the program. We check this by
-        # ensuring the arg is set to None.
-        assert getattr(args, key) is None, \
-            'defaults can only be overwritten for args with None values.'
-        setattr(args, key, defaults[key])
-
-    # Check required arguments.
-    required_args = ['num_layers', 'hidden_size', 'num_attention_heads',
-                     'max_position_embeddings']
-    for req_arg in required_args: 
-        _check_arg_is_not_none(args, req_arg)
-
     # Distributed args.
     args.rank = int(os.getenv('RANK', '0'))
     args.world_size = int(os.getenv("WORLD_SIZE", '1'))
@@ -75,6 +61,26 @@ def parse_args(extra_args_provider=None, defaults={},
     if args.loss_scale is None:
         args.dynamic_loss_scale = True
 
+    # Set input defaults.
+    for key in defaults:
+        # For default to be valid, it should not be provided in the
+        # arguments that are passed to the program. We check this by
+        # ensuring the arg is set to None.
+        if getattr(args, key) is not None:
+            if args.rank == 0:
+                print('WARNING: overriding default arguments for {key}:{v} \
+                       with {key}:{v2}'.format(key=key, v=defaults[key],
+                                               v2=getattr(args, key)),
+                                               flush=True)
+        else:
+            setattr(args, key, defaults[key])
+
+    # Check required arguments.
+    required_args = ['num_layers', 'hidden_size', 'num_attention_heads',
+                     'max_position_embeddings']
+    for req_arg in required_args: 
+        _check_arg_is_not_none(args, req_arg)
+
     # Checks.
     assert args.hidden_size % args.num_attention_heads == 0
     if args.seq_length is not None:
@@ -83,6 +89,17 @@ def parse_args(extra_args_provider=None, defaults={},
         assert args.min_lr <= args.lr
     if args.save is not None:
         assert args.save_interval is not None
+    # Parameters sharing does not work with torch DDP.
+    if (args.num_unique_layers is not None) and (args.num_layers is not None):
+        assert args.num_unique_layers <= args.num_layers
+        assert args.num_layers % args.num_unique_layers == 0, \
+            'num-layers should be divisible by num-unique-layers.'
+        if args.num_unique_layers < args.num_layers:
+            assert args.DDP_impl == 'local', \
+                'torch-DDP does not work with parameters sharing.'
+    # Mixed precision checks.
+    if args.fp16_lm_cross_entropy:
+        assert args.fp16, 'lm cross entropy in fp16 only support in fp16 mode.'
 
     _print_args(args)
     return args
@@ -110,6 +127,16 @@ def _add_network_size_args(parser):
 
     group.add_argument('--num-layers', type=int, default=None,
                        help='Number of transformer layers.')
+    group.add_argument('--num-unique-layers', type=int, default=None,
+                       help='Number of unique transformer layers. '
+                       '`num-layers` should be divisible by this value.')
+    group.add_argument('--param-sharing-style', default='grouped',
+                       choices=['grouped', 'spaced'],
+                       help='Ordering of the shared parameters. For example, '
+                       'for a `num-layers`=4 and `--num-unique-layers`=2, '
+                       'we will have the following ordering for two unique '
+                       'layers 1 and 2: '
+                       '    grouped: [1, 2, 1, 2] and spaced: [1, 1, 2, 2].')
     group.add_argument('--hidden-size', type=int, default=None,
                        help='Tansformer hidden size.')
     group.add_argument('--num-attention-heads', type=int, default=None,
@@ -270,6 +297,10 @@ def _add_mixed_precision_args(parser):
                        help='Window over which to raise/lower dynamic scale.')
     group.add_argument('--min-scale', type=float, default=1,
                        help='Minimum loss scale for dynamic loss scale.')
+    group.add_argument('--fp16-lm-cross-entropy', action='store_true',
+                       help='Move the cross entropy unreduced loss calculation'
+                       'for lm head to fp16.')
+
 
     return parser
 
@@ -332,6 +363,7 @@ def _add_data_args(parser):
     group.add_argument('--tokenizer-type', type=str,
                        default=None,
                        choices=['BertWordPieceLowerCase',
+                                'BertWordPieceCase',
                                 'GPT2BPETokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--data-impl', type=str, default='infer',
