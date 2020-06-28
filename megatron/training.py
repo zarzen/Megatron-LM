@@ -21,7 +21,8 @@ import sys
 
 import torch
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
-from apex.optimizers import FusedAdam as Adam
+# from apex.optimizers import FusedAdam as Adam
+from torch.optim import Adam
 
 from megatron import get_args
 from megatron import get_timers
@@ -128,7 +129,8 @@ def get_model(model_provider_func):
             sum([p.nelement() for p in model.parameters()])), flush=True)
 
     # GPU allocation.
-    model.cuda(torch.cuda.current_device())
+    if not args.layerwise_parallel:
+        model.cuda(torch.cuda.current_device())
 
     # Fp16 conversion.
     if args.fp16:
@@ -237,7 +239,7 @@ def backward_step(optimizer, model, loss):
         loss.backward()
 
     # All-reduce if needed.
-    if args.DDP_impl == 'local':
+    if args.DDP_impl == 'local' and not args.layerwise_parallel:
         timers('allreduce').start()
         model.allreduce_params(reduce_after=False,
                                fp32_allreduce=args.fp32_allreduce)

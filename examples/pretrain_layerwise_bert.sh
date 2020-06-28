@@ -6,7 +6,8 @@ DATA_PATH=my-bert_text_sentence
 CHECKPOINT_PATH=./checkpoints
 
 python pretrain_layerwise_bert.py \
-       --n_gpus 1 \
+       --n_gpus 4 \
+       --layerwise_parallel True \
        --num-layers 24 \
        --hidden-size 1024 \
        --num-attention-heads 16 \
@@ -31,6 +32,5 @@ python pretrain_layerwise_bert.py \
        --log-interval 100 \
        --save-interval 10000 \
        --eval-interval 1000 \
-       --eval-iters 10 \
-       --fp16
+       --eval-iters 10 
 

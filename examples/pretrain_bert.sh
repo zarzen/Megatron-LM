@@ -30,6 +30,5 @@ python pretrain_bert.py \
        --log-interval 100 \
        --save-interval 10000 \
        --eval-interval 1000 \
-       --eval-iters 10 \
-       --fp16
+       --eval-iters 10 
 

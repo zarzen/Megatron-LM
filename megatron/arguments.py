@@ -395,5 +395,6 @@ def _add_autoresume_args(parser):
 def _add_aux_args(parser):
     group = parser.add_argument_group(title='aux for layerwise parallel')
     group.add_argument("--n_gpus", default=1, type=int, help='num of GPUs')
+    group.add_argument("--layerwise_parallel", default=False, type=bool)
 
     return parser

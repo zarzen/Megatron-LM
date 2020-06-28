@@ -9,7 +9,8 @@ from megatron.model.utils import (get_linear_layer, init_method_normal,
                                   openai_gelu, scaled_init_method_normal)
 from megatron.module import MegatronModule
 from megatron.model.transformer import ParallelTransformerLayer
-from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
+# from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
+from torch.nn import LayerNorm
 from megatron.model.language_model import Embedding, Pooler
 
 
@@ -48,7 +49,7 @@ class LayerwiseParallelTransformer(MegatronModule):
         _c = 1
         for i in range(args.n_gpus):
             # move the layers to corresponding GPU
-            self.layers.extend([build_layer(_c).to('cuda:'+str(i)) for _ in range(layer_per_gpu)])
+            self.layers.extend([build_layer(_c).to("cuda:"+str(i)) for _ in range(layer_per_gpu)])
             self.layer_devices.extend([i for _ in range(layer_per_gpu)])
             _c += 1
         self.layers = torch.nn.ModuleList(self.layers)
@@ -65,7 +66,7 @@ class LayerwiseParallelTransformer(MegatronModule):
         # Final layer norm before output.
         self.final_layernorm = LayerNorm(
             args.hidden_size,
-            eps=args.layernorm_epsilon)
+            eps=args.layernorm_epsilon).to("cuda:"+str(args.n_gpus-1))
 
     def _get_layer_index(self, layer_number):
         if self.param_sharing_style == 'grouped':
@@ -123,6 +124,8 @@ class LayerwiseParallelTransformer(MegatronModule):
                     past = layer_past[index]
                 if index == 0 or self.layer_devices[index - 1] != self.layer_devices[index]:
                     hidden_states = hidden_states.to("cuda:"+ str(self.layer_devices[index]))
+                    attention_mask = attention_mask.to("cuda:"+ str(self.layer_devices[index]))
+                
                 hidden_states = layer(hidden_states,
                                       attention_mask,
                                       layer_past=past,
@@ -167,6 +170,7 @@ class LayerwiseTransformerLanguageModel(MegatronModule):
                  add_pooler=False):
         super(LayerwiseTransformerLanguageModel, self).__init__()
         args = get_args()
+        self.args = args
 
         self.hidden_size = args.hidden_size
         self.num_tokentypes = num_tokentypes
@@ -179,7 +183,7 @@ class LayerwiseTransformerLanguageModel(MegatronModule):
                                    args.max_position_embeddings,
                                    args.hidden_dropout,
                                    self.init_method,
-                                   self.num_tokentypes)
+                                   self.num_tokentypes).to('cuda:0')
         self._embedding_key = 'embedding'
 
         # Transformer
@@ -190,13 +194,15 @@ class LayerwiseTransformerLanguageModel(MegatronModule):
 
         # Pooler
         if self.add_pooler:
-            self.pooler = Pooler(self.hidden_size, self.init_method)
+            self.pooler = Pooler(self.hidden_size, self.init_method).to('cuda:'+str(args.n_gpus-1))
             self._pooler_key = 'pooler'
 
     def forward(self, input_ids, position_ids, attention_mask,
                 tokentype_ids=None, layer_past=None, get_key_value=False,
                 pooling_sequence_index=0):
-
+        # input_ids = input_ids.to('cuda:' + str(self.args.n_gpus - 1))
+        # position_ids = position_ids
+        # tokentype_ids = tokentype_ids.to('cuda:' + str(self.args.n_gpus - 1))
         # Embeddings.
         embedding_output = self.embedding(input_ids, position_ids,
                                           tokentype_ids=tokentype_ids)
@@ -314,12 +320,13 @@ class LayerwiseBertModel(MegatronModule):
         self.lm_head = BertLMHead(
             self.language_model.embedding.word_embeddings.weight.size(0),
             args.hidden_size, init_method, args.layernorm_epsilon,
-            parallel_output)
+            parallel_output).to('cuda:0')
         self._lm_head_key = 'lm_head'
 
         if self.add_binary_head:
             self.binary_head = get_linear_layer(args.hidden_size, 2,
                                                 init_method)
+            self.binary_head = self.binary_head.to('cuda:0')
             self._binary_head_key = 'binary_head'
 
     def forward(self, input_ids, attention_mask,
@@ -335,12 +342,14 @@ class LayerwiseBertModel(MegatronModule):
                 position_ids,
                 extended_attention_mask,
                 tokentype_ids=tokentype_ids)
+            lm_output, pooled_output = lm_output.to('cuda:0'), pooled_output.to('cuda:0')
         else:
             lm_output = self.language_model(
                 input_ids,
                 position_ids,
                 extended_attention_mask,
                 tokentype_ids=tokentype_ids)
+            lm_output = lm_output.to('cuda:0')
 
         # Output.
         lm_logits = self.lm_head(
