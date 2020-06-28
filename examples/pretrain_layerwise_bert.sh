@@ -5,7 +5,8 @@ WORLD_SIZE=1
 DATA_PATH=my-bert_text_sentence
 CHECKPOINT_PATH=./checkpoints
 
-python pretrain_bert.py \
+python pretrain_layerwise_bert.py \
+       --n_gpus 1 \
        --num-layers 24 \
        --hidden-size 1024 \
        --num-attention-heads 16 \

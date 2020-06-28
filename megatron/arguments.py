@@ -37,6 +37,7 @@ def parse_args(extra_args_provider=None, defaults={},
     parser = _add_validation_args(parser)
     parser = _add_data_args(parser)
     parser = _add_autoresume_args(parser)
+    parser = _add_aux_args(parser)
 
     # Custom arguments.
     if extra_args_provider is not None:
@@ -388,5 +389,11 @@ def _add_autoresume_args(parser):
     group.add_argument('--adlr-autoresume-interval', type=int, default=1000,
                        help='Intervals over which check for autoresume'
                        'termination signal')
+
+    return parser
+
+def _add_aux_args(parser):
+    group = parser.add_argument_group(title='aux for layerwise parallel')
+    group.add_argument("--n_gpus", default=1, type=int, help='num of GPUs')
 
     return parser
