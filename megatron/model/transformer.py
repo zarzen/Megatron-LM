@@ -18,7 +18,8 @@
 import math
 
 import torch
-from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
+# from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
+from torch.nn import LayerNorm
 
 from megatron import get_args
 from megatron import mpu
@@ -71,6 +72,7 @@ class ParallelMLP(MegatronModule):
             args.hidden_size,
             4 * args.hidden_size,
             init_method=init_method)
+        self.dense_h_to_4h.fullname = "dense_h_to_4h"
 
         self.activation_func = mlp_activation_func
 
@@ -80,6 +82,7 @@ class ParallelMLP(MegatronModule):
             args.hidden_size,
             # input_is_parallel=True,
             init_method=output_layer_init_method)
+        self.dense_4h_to_h.fullname = "dense_4h_to_h"
 
         self.dropout = torch.nn.Dropout(args.hidden_dropout)
 

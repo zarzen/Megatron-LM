@@ -37,6 +37,7 @@ from .random import get_cuda_rng_tracker
 from .utils import divide
 from .utils import split_tensor_along_last_dim
 from .utils import VocabUtility
+import time
 
 
 def _initialize_affine_weight(weight, output_size, input_size,
@@ -323,9 +324,17 @@ class RowParallelLinear(torch.nn.Module):
         else:
             input_parallel = scatter_to_model_parallel_region(input_)
         # Matrix multiply.
+        # torch.cuda.synchronize()
+        # t1 = time.time()
         output_parallel = F.linear(input_parallel, self.weight)
+        # torch.cuda.synchronize()
+        # t2 = time.time()
         # All-reduce across all the partitions.
         output_ = reduce_from_model_parallel_region(output_parallel)
+        # torch.cuda.synchronize()
+        # t3 = time.time()
+        # if hasattr(self, "fullname"):
+            # print(self.fullname, ": *** matmul {}, allreduce {}".format((t2-t1)*1e3, (t3 - t2) * 1e3))
         if self.bias is not None:
             output = output_ + self.bias
         else:

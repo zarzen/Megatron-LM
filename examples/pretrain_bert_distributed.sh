@@ -8,18 +8,18 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-DATA_PATH=<Specify path and file prefix>_text_sentence
-CHECKPOINT_PATH=<Specify path>
+DATA_PATH=my-bert_text_sentence
+CHECKPOINT_PATH=./checkpoints
 
 DISTRIBUTED_ARGS="--nproc_per_node $GPUS_PER_NODE --nnodes $NNODES --node_rank $NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT"
 
 python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        pretrain_bert.py \
-       --model-parallel-size 1 \
+       --model-parallel-size 8 \
        --num-layers 24 \
        --hidden-size 1024 \
        --num-attention-heads 16 \
-       --batch-size 4 \
+       --batch-size 32 \
        --seq-length 512 \
        --max-position-embeddings 512 \
        --train-iters 1000000 \
@@ -40,5 +40,4 @@ python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --log-interval 100 \
        --save-interval 10000 \
        --eval-interval 1000 \
-       --eval-iters 10 \
-       --fp16
+       --eval-iters 10 
