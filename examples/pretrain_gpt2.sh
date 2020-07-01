@@ -5,15 +5,15 @@
 RANK=0
 WORLD_SIZE=1
 
-DATA_PATH=<Specify path and file prefix>_text_document
-CHECKPOINT_PATH=<Specify path>
+DATA_PATH=./data/my-gpt2_text_document
+CHECKPOINT_PATH=./checkpoints
 
 
 python pretrain_gpt2.py \
        --num-layers 24 \
        --hidden-size 1024 \
        --num-attention-heads 16 \
-       --batch-size 8 \
+       --batch-size 4 \
        --seq-length 1024 \
        --max-position-embeddings 1024 \
        --train-iters 500000 \
@@ -21,8 +21,8 @@ python pretrain_gpt2.py \
        --save $CHECKPOINT_PATH \
        --load $CHECKPOINT_PATH \
        --data-path $DATA_PATH \
-       --vocab-file gpt2-vocab.json \
-       --merge-file gpt2-merges.txt \
+       --vocab-file ./data/gpt2-vocab.json \
+       --merge-file ./data/gpt2-merges.txt \
        --data-impl mmap \
        --split 949,50,1 \
        --distributed-backend nccl \
