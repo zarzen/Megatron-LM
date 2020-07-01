@@ -18,7 +18,8 @@
 import math
 
 import torch
-from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
+# from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
+from torch.nn import LayerNorm
 
 from megatron import get_args
 from megatron import mpu

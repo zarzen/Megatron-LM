@@ -34,7 +34,7 @@ def model_provider():
 
     print_rank_0('building GPT2 model ...')
     model = GPT2Model(num_tokentypes=0, parallel_output=True)
-
+    print_rank_0(model)
     return model
 
 
