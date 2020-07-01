@@ -34,6 +34,7 @@ python pretrain_layerwise_gpt2.py \
        --weight-decay 1e-2 \
        --clip-grad 1.0 \
        --warmup .01 \
+       --checkpoint-activations \
        --log-interval 100 \
        --save-interval 10000 \
        --eval-interval 1000 \

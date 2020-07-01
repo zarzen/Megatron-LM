@@ -85,7 +85,12 @@ class LayerwiseParallelTransformer(MegatronModule):
                 x_ = inputs[0]
                 for index in range(start, end):
                     layer = self._get_layer(index)
-                    x_ = layer(x_, inputs[1])
+                    x2_ = inputs[1]
+                    if x_.device.index != self.layer_devices[index]:
+                        x_ = x_.to("cuda:"+ str(self.layer_devices[index]))
+                    if x2_.device.index != self.layer_devices[index]:
+                        x2_ = x2_.to("cuda:"+ str(self.layer_devices[index]))
+                    x_ = layer(x_, x2_)
                 return x_
             return custom_forward
 
