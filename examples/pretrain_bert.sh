@@ -7,6 +7,7 @@ CHECKPOINT_PATH=/fsx-dev/zhzhn/megatron-LM-checkpoints
 VOCAB_FILE=/fsx-dev/zhzhn/vocabs/bert-large-uncased-vocab.txt
 
 export MASTER_ADDR=127.0.0.1
+export MASTER_PORT=34560
 
 python3 pretrain_bert.py \
        --num-layers 24 \
