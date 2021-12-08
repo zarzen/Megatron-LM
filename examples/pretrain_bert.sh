@@ -17,7 +17,7 @@ python3 pretrain_bert.py \
        --global-batch-size 8 \
        --seq-length 512 \
        --max-position-embeddings 512 \
-       --train-iters 2000000 \
+       --train-iters 100 \
        --lr-decay-iters 990000 \
        --save $CHECKPOINT_PATH \
        --load $CHECKPOINT_PATH \
@@ -31,7 +31,7 @@ python3 pretrain_bert.py \
        --lr-warmup-fraction .01 \
        --weight-decay 1e-2 \
        --clip-grad 1.0 \
-       --log-interval 100 \
+       --log-interval 10 \
        --save-interval 10000 \
        --eval-interval 1000 \
        --eval-iters 10 \
