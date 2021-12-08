@@ -44,6 +44,9 @@ def model_provider(pre_process=True, post_process=True):
         pre_process=pre_process,
         post_process=post_process)
 
+    # print(model)
+    print_rank_0(f'padded vocab size: {args.padded_vocab_size}')
+    print_rank_0(model)
     return model
 
 
@@ -97,7 +100,7 @@ def loss_func(loss_mask, sentence_order, output_tensor):
             [lm_loss])
         return loss, {'lm loss': averaged_losses[0]}
 
-
+data_iter_count = 0
 def forward_step(data_iterator, model):
     """Forward step."""
     args = get_args()
@@ -107,6 +110,14 @@ def forward_step(data_iterator, model):
     timers('batch-generator').start()
     tokens, types, sentence_order, loss_mask, lm_labels, padding_mask = get_batch(
         data_iterator)
+    global data_iter_count
+    if data_iter_count < 1:
+        print_rank_0(f'{sentence_order}')
+    if data_iter_count < 10:
+        print_rank_0(f'{tokens.size()}, {types.size()}, {sentence_order.size()}, {loss_mask.size()}, '
+                f'{lm_labels.size()}, {padding_mask.size()}')
+        data_iter_count += 1
+
     timers('batch-generator').stop()
 
     if not args.bert_binary_head:

@@ -46,7 +46,9 @@ def build_tokenizer(args):
                                   'implemented.'.format(args.tokenizer_type))
 
     # Add vocab size.
-    args.padded_vocab_size = _vocab_size_with_padding(tokenizer.vocab_size,
+    # args.padded_vocab_size = _vocab_size_with_padding(tokenizer.vocab_size,
+    #                                                   args)
+    args.padded_vocab_size = _vocab_size_with_padding(32008,
                                                       args)
 
     return tokenizer
@@ -55,7 +57,6 @@ def build_tokenizer(args):
 def _vocab_size_with_padding(orig_vocab_size, args):
     """Pad vocab size so it is divisible by model parallel size and
     still having GPU friendly size."""
-
     after = orig_vocab_size
     multiple = args.make_vocab_size_divisible_by * \
         args.tensor_model_parallel_size

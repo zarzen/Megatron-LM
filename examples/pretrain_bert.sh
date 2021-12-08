@@ -2,10 +2,13 @@
 
 RANK=0
 WORLD_SIZE=1
-DATA_PATH=<Specify path and file prefix>_text_sentence
-CHECKPOINT_PATH=<Specify path>
+DATA_PATH=/fsx-dev/zhzhn/megatron-data/bench-bert-data_text_sentence
+CHECKPOINT_PATH=/fsx-dev/zhzhn/megatron-LM-checkpoints
+VOCAB_FILE=/fsx-dev/zhzhn/vocabs/bert-large-uncased-vocab.txt
 
-python pretrain_bert.py \
+export MASTER_ADDR=127.0.0.1
+
+python3 pretrain_bert.py \
        --num-layers 24 \
        --hidden-size 1024 \
        --num-attention-heads 16 \
@@ -18,7 +21,7 @@ python pretrain_bert.py \
        --save $CHECKPOINT_PATH \
        --load $CHECKPOINT_PATH \
        --data-path $DATA_PATH \
-       --vocab-file bert-vocab.txt \
+       --vocab-file $VOCAB_FILE \
        --data-impl mmap \
        --split 949,50,1 \
        --lr 0.0001 \
