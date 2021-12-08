@@ -35,4 +35,8 @@ python3 pretrain_bert.py \
        --save-interval 10000 \
        --eval-interval 1000 \
        --eval-iters 10 \
+       --activations-checkpoint-method uniform \
+       --no-bias-gelu-fusion \
+       --no-bias-dropout-fusion \
+       --no-masked-softmax-fusion \
        --fp16
