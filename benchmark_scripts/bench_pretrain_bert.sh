@@ -27,7 +27,7 @@ python3 -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --hidden-size 2560 \
        --num-attention-heads 40 \
        --micro-batch-size 8 \
-       --global-batch-size 8192 \
+       --global-batch-size 4096 \
        --seq-length 512 \
        --max-position-embeddings 512 \
        --train-iters 10000 \
@@ -45,7 +45,7 @@ python3 -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --weight-decay 1e-2 \
        --clip-grad 1.0 \
        --lr-warmup-fraction .01 \
-       --log-interval 5 \
+       --log-interval 1 \
        --save-interval 10000 \
        --eval-interval 1000 \
        --eval-iters 10 \
