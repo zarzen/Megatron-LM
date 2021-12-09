@@ -27,6 +27,7 @@ def init_ssh_clients(host_ips):
 
 def __run_cmd(cli: SSHClient, cmd: str, timeout):
     output = cli.run_command(cmd, use_pty=True, read_timeout=timeout)
+    print(f"{output.host} :: {cmd}")
     read_start_time = time.time()
     for line in output.stdout:
         print(f"{output.host} :: {line}")
