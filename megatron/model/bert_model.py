@@ -80,10 +80,10 @@ class BertLMHead(MegatronModule):
         self.dense = get_linear_layer(hidden_size, hidden_size, init_method)
         self.layernorm = LayerNorm(hidden_size, eps=layernorm_epsilon)
         self.gelu = torch.nn.functional.gelu
-        if args.openai_gelu:
-            self.gelu = openai_gelu
-        elif args.onnx_safe:
-            self.gelu = erf_gelu
+        # if args.openai_gelu:
+        #     self.gelu = openai_gelu
+        # elif args.onnx_safe:
+        #     self.gelu = erf_gelu
 
     def forward(self, hidden_states, word_embeddings_weight):
         hidden_states = self.dense(hidden_states)
