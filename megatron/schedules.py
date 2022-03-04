@@ -15,6 +15,7 @@
 
 from contextlib import contextmanager
 import torch
+from torch.autograd.variable import Variable
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 
 from megatron import get_args
@@ -42,6 +43,60 @@ def get_forward_backward_func():
         forward_backward_func = forward_backward_no_pipelining
     return forward_backward_func
 
+def deallocate_output_tensor(out):
+    '''Pseudo-deallocate (i.e., set to scalar) the output tensor's '.data' field.
+
+    This method should be called right after the output tensor has been
+    sent to the next pipeline stage. At this point, the output tensor is
+    only useful for its '.grad_fn' field, and not its '.data'.
+    '''
+    if out is None:
+        return
+    assert isinstance(out, torch.Tensor), \
+        "expected Tensor, found %s." % type(out).__name__
+    assert out._base is None, \
+        "counter-productive to free a view of another tensor."
+    out.data = torch.empty(
+        (1,),
+        device = out.device,
+        dtype = out.dtype,
+    )
+        
+def custom_backward(output, grad_output):
+    '''Directly call C++ autograd engine.
+
+    To make the 'deallocate_output_tensor' (above) optimization work, the C++
+    autograd engine must be called directly, bypassing Pytorch's
+    torch.autograd.backward. Pytorch's 'backward' checks that the output and
+    grad have the same shape, while C++'s 'backward' does not.
+    '''
+
+    assert output.numel() == 1, \
+        "output should be pseudo-'freed' in schedule, to optimize memory"
+    assert isinstance(output, torch.Tensor), \
+        "output == '%s'." % type(output).__name__
+    assert isinstance(grad_output, (torch.Tensor, type(None))), \
+        "grad_output == '%s'." % type(grad_output).__name__
+
+    # Handle scalar output
+    if grad_output is None:
+        assert output.numel() == 1, "implicit grad requires scalar output."
+        grad_output = torch.ones_like(
+            output,
+            memory_format = torch.preserve_format,
+        )
+
+    # Call c++ engine [ see torch/csrc/autograd/python_engine.cpp ]
+    Variable._execution_engine.run_backward(
+        tensors = (output,),
+        grad_tensors = (grad_output,),
+        keep_graph = False,
+        create_graph = False,
+        inputs = tuple(),
+        allow_unreachable=True,
+        accumulate_grad=True,
+    )
+        
 
 def forward_step(forward_step_func, data_iterator, model, input_tensor, losses_reduced):
     """Forward step for passed-in model.
@@ -116,7 +171,7 @@ def backward_step(optimizer, input_tensor, output_tensor, output_tensor_grad):
     # Backward pass.
     if output_tensor_grad[0] is None:
         output_tensor = optimizer.scale_loss(output_tensor[0])
-    torch.autograd.backward(output_tensor[0], grad_tensors=output_tensor_grad[0])
+    custom_backward(output_tensor[0], output_tensor_grad[0])
 
     # Collect the grad of the input_tensor.
     input_tensor_grad = [None]
@@ -325,6 +380,7 @@ def forward_backward_pipelining_with_interleaving(forward_step_func, data_iterat
                     tensor_shape=tensor_shape,
                     timers=timers)
         input_tensors[next_forward_model_chunk_id].append(input_tensor)
+        deallocate_output_tensor(output_tensor)
 
     # Run 1F1B in steady state.
     for k in range(num_microbatches_remaining):
@@ -388,6 +444,7 @@ def forward_backward_pipelining_with_interleaving(forward_step_func, data_iterat
                     output_tensor, input_tensor_grad,
                     recv_prev=recv_prev, recv_next=recv_next,
                     tensor_shape=tensor_shape, timers=timers)
+        deallocate_output_tensor(output_tensor)
 
         # Put input_tensor and output_tensor_grad in data structures in the
         # right location.
@@ -521,6 +578,7 @@ def forward_backward_pipelining_without_interleaving(forward_step_func, data_ite
     stages.
 
     Returns dictionary with losses if the last stage, empty dict otherwise."""
+    args = get_args()
     timers = get_timers()
 
     assert len(model) == 1
@@ -562,6 +620,7 @@ def forward_backward_pipelining_without_interleaving(forward_step_func, data_ite
         if not forward_only:
             input_tensors.append(input_tensor)
             output_tensors.append(output_tensor)
+            deallocate_output_tensor(output_tensor[0])
 
     # Before running 1F1B, need to receive first forward tensor.
     # If all microbatches are run in warmup / cooldown phase, then no need to
@@ -590,6 +649,7 @@ def forward_backward_pipelining_without_interleaving(forward_step_func, data_ite
             # Add input_tensor and output_tensor to end of list.
             input_tensors.append(input_tensor)
             output_tensors.append(output_tensor)
+            deallocate_output_tensor(output_tensor[0])
 
             # Pop input_tensor and output_tensor from the start of the list for
             # the backward pass.

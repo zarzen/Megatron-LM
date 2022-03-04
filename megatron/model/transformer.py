@@ -27,7 +27,6 @@ from megatron.model.fused_softmax import FusedScaleMaskSoftmax
 from megatron.model.fused_bias_gelu import bias_gelu_impl
 from megatron.model.utils import attention_mask_func, openai_gelu, erf_gelu
 
-
 """ We use the following notation throughout this file:
      h: hidden size
      n: number of attention heads
@@ -580,6 +579,7 @@ class ParallelTransformer(MegatronModule):
             assert args.num_layers % args.virtual_pipeline_model_parallel_size == 0, \
                 'num_layers_per_stage must be divisible by ' \
                 'virtual_pipeline_model_parallel_size'
+            assert args.model_type != ModelType.encoder_and_decoder
             # Number of layers in each model chunk is the number of layers in the stage,
             # divided by the number of model chunks in a stage.
             self.num_layers = self.num_layers // args.virtual_pipeline_model_parallel_size
@@ -596,7 +596,16 @@ class ParallelTransformer(MegatronModule):
                 (mpu.get_pipeline_model_parallel_rank() * self.num_layers)
         else:
             # Each stage gets a contiguous set of layers.
-            offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
+            if args.model_type == ModelType.encoder_and_decoder and \
+                    mpu.get_pipeline_model_parallel_world_size() > 1:
+                pipeline_rank = mpu.get_pipeline_model_parallel_rank()
+                if layer_type == LayerType.encoder:
+                    offset = pipeline_rank * self.num_layers
+                else:
+                    num_ranks_in_enc = args.pipeline_model_parallel_split_rank
+                    offset = (pipeline_rank - num_ranks_in_enc) * self.num_layers
+            else:
+                offset = mpu.get_pipeline_model_parallel_rank() * self.num_layers
 
         self.layers = torch.nn.ModuleList(
             [build_layer(i + 1 + offset) for i in range(self.num_layers)])
@@ -686,9 +695,32 @@ class ParallelTransformer(MegatronModule):
             # See set_input_tensor()
             hidden_states = self.input_tensor
 
-        if encoder_output is not None:
-             encoder_output = encoder_output.transpose(0, 1).contiguous()
+        # Viewless tensor.
+        # - We only need to create a viewless tensor in the case of micro batch
+        #   size (mbs) == 1, since in this case, 'hidden_states.transpose()'
+        #   above creates a view tensor, and '.contiguous()' is a pass-through.
+        #   For mbs >= 2, '.contiguous()' creates a new tensor, eliminating
+        #   the need to make it viewless.
+        #
+        #   However, we don't explicitly check mbs == 1 here because
+        #   make_viewless_tensor() has negligible overhead when its input
+        #   is already viewless.
+        # 
+        # - For the 'else' case above, calling make_viewless_tensor() here is
+        #   likely redundant, since p2p_communication.py (likely originator)
+        #   already creates viewless tensors. That said, make_viewless_tensor()
+        #   is called here to be future-proof and corner-case-proof.
+        hidden_states = mpu.make_viewless_tensor(
+            hidden_states,
+            requires_grad = True,
+            keep_graph = True,
+        )
 
+        # Transpose encoder output.
+        if encoder_output is not None:
+            encoder_output = encoder_output.transpose(0, 1).contiguous()
+
+        # Forward pass.
         if self.activations_checkpoint_method is not None:
             hidden_states = self._checkpointed_forward(hidden_states,
                                                        attention_mask,
