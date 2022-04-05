@@ -38,6 +38,7 @@ from .utils import split_tensor_along_last_dim
 from .utils import VocabUtility
 from megatron import get_args
 
+from .utils import instrument_w_nvtx
 
 _MODEL_PARALLEL_ATTRIBUTE_DEFAULTS = {'tensor_model_parallel': False,
                                       'partition_dim': -1,
@@ -218,15 +219,16 @@ class ColumnParallelLinearWithAsyncAllreduce(torch.autograd.Function):
         input, weight = ctx.saved_tensors
         use_bias = ctx.use_bias
         grad_input = grad_output.matmul(weight)
-        # Asyncronous all-reduce
-        handle = torch.distributed.all_reduce(
-                grad_input, group=get_tensor_model_parallel_group(), async_op=True)
-        # Delay the start of weight gradient computation shortly (3us) to have
-        # all-reduce scheduled first and have GPU resources allocated
-        _ = torch.empty(1, device=grad_output.device) + 1
-        grad_weight = grad_output.t().matmul(input)
-        grad_bias = grad_output.sum(dim=0) if use_bias else None
-        handle.wait()
+        with torch.cuda.nvtx.range("ColParallel-backward"):
+            # Asyncronous all-reduce
+            handle = torch.distributed.all_reduce(
+                    grad_input, group=get_tensor_model_parallel_group(), async_op=True)
+            # Delay the start of weight gradient computation shortly (3us) to have
+            # all-reduce scheduled first and have GPU resources allocated
+            _ = torch.empty(1, device=grad_output.device) + 1
+            grad_weight = grad_output.t().matmul(input)
+            grad_bias = grad_output.sum(dim=0) if use_bias else None
+            handle.wait()
         return grad_input, grad_weight, grad_bias
 
 
@@ -309,7 +311,7 @@ class ColumnParallelLinear(torch.nn.Module):
                 world_size > 1)
 
 
-
+    @instrument_w_nvtx
     def forward(self, input_):
         bias = self.bias if not self.skip_bias_add else None
 
@@ -417,7 +419,7 @@ class RowParallelLinear(torch.nn.Module):
             self.register_parameter('bias', None)
 
 
-
+    @instrument_w_nvtx
     def forward(self, input_):
         # Set up backprop all-reduce.
         if self.input_is_parallel:

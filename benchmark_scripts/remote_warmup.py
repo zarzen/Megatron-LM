@@ -16,7 +16,7 @@ def main():
     ssh_clients = init_ssh_clients(host_ips)
     cmd = " && ".join([
         "cd /tmp/Megatron-LM",
-        "bash ./examples/pretrain_bert.sh"
+        "bash ./benchmark_scripts/bench_bert_synthetic.sh"
     ])
     parallel_exec_wait(ssh_clients, cmd, timeout=1200)
 
