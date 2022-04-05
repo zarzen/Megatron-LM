@@ -19,10 +19,11 @@ WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 TMP=$4
 PMP=$5
 
-DATA_PATH=data/my-bert_text_sentence
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+DATA_PATH=$SCRIPT_DIR/../data/my-bert_text_sentence
 # VOCAB_FILE=<Specify path to vocab.txt>
-VOCAB_FILE=data/bert-large-uncased-vocab.txt
-CHECKPOINT_PATH=data/megatron-LM-checkpoints
+VOCAB_FILE=$SCRIPT_DIR/../data/bert-large-uncased-vocab.txt
+CHECKPOINT_PATH=$SCRIPT_DIR/../data/megatron-LM-checkpoints
 
 echo "NNODES $NNODES, NODE_RANK $NODE_RANK, WORLD_SIZE $WORLD_SIZE"
 export NCCL_DEBUG=WARN
@@ -31,8 +32,9 @@ echo $LD_LIBRARY_PATH
 
 DISTRIBUTED_ARGS="--nproc_per_node $GPUS_PER_NODE --nnodes $NNODES --node_rank $NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT"
 
+TRAIN_SCRIPT_FILE=$SCRIPT_DIR/../pretrain_bert.py
 python3 -m torch.distributed.launch $DISTRIBUTED_ARGS \
-       pretrain_bert.py \
+       $TRAIN_SCRIPT_FILE \
        --tensor-model-parallel-size $TMP \
        --pipeline-model-parallel-size $PMP \
        --num-layers $N_LAYERS \
