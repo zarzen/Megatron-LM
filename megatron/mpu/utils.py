@@ -68,3 +68,17 @@ class VocabUtility:
         per_partition_vocab_size = divide(global_vocab_size, world_size)
         return VocabUtility.vocab_range_from_per_partition_vocab_size(
             per_partition_vocab_size, rank, world_size)
+
+
+def instrument_w_nvtx(func):
+    """decorator that causes an NVTX range to be recorded for the duration of the
+    function call."""
+    if hasattr(torch.cuda.nvtx, "range"):
+
+        def wrapped_fn(*args, **kwargs):
+            with torch.cuda.nvtx.range(func.__qualname__):
+                return func(*args, **kwargs)
+
+        return wrapped_fn
+    else:
+        return func

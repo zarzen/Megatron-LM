@@ -17,7 +17,7 @@ import torch
 
 from .initialize import get_tensor_model_parallel_group, get_tensor_model_parallel_world_size, get_tensor_model_parallel_rank
 from .utils import split_tensor_along_last_dim
-
+from .utils import instrument_w_nvtx
 
 def _reduce(input_):
     """All-reduce the input tensor across model parallel group."""
@@ -259,18 +259,19 @@ class _ReduceScatterToSequenceParallelRegion(torch.autograd.Function):
 # Helper functions.
 # -----------------
 
+@instrument_w_nvtx
 def copy_to_tensor_model_parallel_region(input_):
     return _CopyToModelParallelRegion.apply(input_)
 
-
+@instrument_w_nvtx
 def reduce_from_tensor_model_parallel_region(input_):
     return _ReduceFromModelParallelRegion.apply(input_)
 
-
+@instrument_w_nvtx
 def scatter_to_tensor_model_parallel_region(input_):
     return _ScatterToModelParallelRegion.apply(input_)
 
-
+@instrument_w_nvtx
 def gather_from_tensor_model_parallel_region(input_):
     return _GatherFromModelParallelRegion.apply(input_)
 

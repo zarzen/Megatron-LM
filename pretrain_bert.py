@@ -113,7 +113,7 @@ def forward_step(data_iterator, model):
     global data_iter_count
     if data_iter_count < 1:
         print_rank_0(f'{sentence_order}')
-    if data_iter_count < 10:
+    if data_iter_count < 5:
         print_rank_0(f'{tokens.size()}, {types.size()}, {sentence_order.size()}, {loss_mask.size()}, '
                 f'{lm_labels.size()}, {padding_mask.size()}')
         data_iter_count += 1

@@ -20,6 +20,7 @@ import torch
 from megatron import get_args
 from megatron import mpu
 
+from megatron.utils import instrument_w_nvtx
 
 def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
                  tensor_shape,
@@ -158,7 +159,7 @@ def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
 
     return tensor_recv_prev, tensor_recv_next
 
-
+@instrument_w_nvtx
 def recv_forward(tensor_shape=None, dtype_=None, timers=None):
     """Receive tensor from previous rank in pipeline (forward receive)."""
 
@@ -178,7 +179,7 @@ def recv_forward(tensor_shape=None, dtype_=None, timers=None):
             timers('forward-recv').stop()
     return input_tensor
 
-
+@instrument_w_nvtx
 def recv_backward(tensor_shape=None, timers=None):
     """Receive tensor from next rank in pipeline (backward receive)."""
     if mpu.is_pipeline_last_stage():
@@ -196,7 +197,7 @@ def recv_backward(tensor_shape=None, timers=None):
             timers('backward-recv').stop()
     return output_tensor_grad
 
-
+@instrument_w_nvtx
 def send_forward(output_tensor, tensor_shape=None, dtype_=None, timers=None):
     """Send tensor to next rank in pipeline (forward send)."""
 
@@ -213,7 +214,7 @@ def send_forward(output_tensor, tensor_shape=None, dtype_=None, timers=None):
         if timers is not None:
             timers('forward-send').stop()
 
-
+@instrument_w_nvtx
 def send_backward(input_tensor_grad, tensor_shape=None, timers=None):
     """Send tensor to previous rank in pipeline (backward send)."""
     if not mpu.is_pipeline_first_stage():
@@ -228,7 +229,7 @@ def send_backward(input_tensor_grad, tensor_shape=None, timers=None):
         if timers is not None:
             timers('backward-send').stop()
 
-
+@instrument_w_nvtx
 def send_forward_recv_backward(output_tensor, tensor_shape=None, timers=None):
     """Batched send and recv with next rank in pipeline."""
     if mpu.is_pipeline_last_stage():
@@ -246,7 +247,7 @@ def send_forward_recv_backward(output_tensor, tensor_shape=None, timers=None):
             timers('forward-send-backward-recv').stop()
     return output_tensor_grad
 
-
+@instrument_w_nvtx
 def send_backward_recv_forward(input_tensor_grad, tensor_shape=None, timers=None):
     """Batched send and recv with previous rank in pipeline."""
     if mpu.is_pipeline_first_stage():
@@ -264,7 +265,7 @@ def send_backward_recv_forward(input_tensor_grad, tensor_shape=None, timers=None
             timers('backward-send-forward-recv').stop()
     return input_tensor
 
-
+@instrument_w_nvtx
 def send_forward_recv_forward(output_tensor, recv_prev, tensor_shape=None, timers=None):
     """Batched recv from previous rank and send to next rank in pipeline."""
     if timers is not None:
@@ -279,7 +280,7 @@ def send_forward_recv_forward(output_tensor, recv_prev, tensor_shape=None, timer
         timers('forward-send-forward-recv').stop()
     return input_tensor
 
-
+@instrument_w_nvtx
 def send_backward_recv_backward(input_tensor_grad, recv_next, tensor_shape=None, timers=None):
     """Batched recv from next rank and send to previous rank in pipeline."""
     if timers is not None:
@@ -294,7 +295,7 @@ def send_backward_recv_backward(input_tensor_grad, recv_next, tensor_shape=None,
         timers('backward-send-backward-recv').stop()
     return output_tensor_grad
 
-
+@instrument_w_nvtx
 def send_forward_backward_recv_forward_backward(
         output_tensor, input_tensor_grad, recv_prev,
         recv_next, tensor_shape=None, timers=None):

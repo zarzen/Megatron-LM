@@ -500,7 +500,7 @@ class RowParallelLinear(torch.nn.Module):
         self.gradient_accumulation_fusion = args.gradient_accumulation_fusion
 
 
-
+    @instrument_w_nvtx
     def forward(self, input_):
         # Set up backprop all-reduce.
         if self.input_is_parallel:
