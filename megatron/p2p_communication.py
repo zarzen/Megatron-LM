@@ -110,33 +110,25 @@ def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
                                         tensor_recv_next=tensor_recv_next,
                                         group=mpu.get_pipeline_model_parallel_group())
     else:
-        ops = []
         if tensor_send_prev is not None:
-            send_prev_op = torch.distributed.P2POp(
-                torch.distributed.isend, tensor_send_prev,
-                mpu.get_pipeline_model_parallel_prev_rank())
-            ops.append(send_prev_op)
+            torch.distributed.send(
+                tensor_send_prev,
+                mpu.get_pipeline_model_parallel_prev_rank()
+            )
         if tensor_recv_prev is not None:
-            recv_prev_op = torch.distributed.P2POp(
-                torch.distributed.irecv, tensor_recv_prev,
-                mpu.get_pipeline_model_parallel_prev_rank())
-            ops.append(recv_prev_op)
+            torch.distributed.recv(
+                tensor_recv_prev,
+                mpu.get_pipeline_model_parallel_prev_rank()
+            )
         if tensor_send_next is not None:
-            send_next_op = torch.distributed.P2POp(
-                torch.distributed.isend, tensor_send_next,
-                mpu.get_pipeline_model_parallel_next_rank())
-            ops.append(send_next_op)
+            torch.distributed.send(
+                tensor_send_next,
+                mpu.get_pipeline_model_parallel_next_rank()
+            )
+
         if tensor_recv_next is not None:
-            recv_next_op = torch.distributed.P2POp(
-                torch.distributed.irecv, tensor_recv_next,
+            torch.distributed.recv(tensor_recv_next, 
                 mpu.get_pipeline_model_parallel_next_rank())
-            ops.append(recv_next_op)
-        if len(ops) > 0:
-            reqs = torch.distributed.batch_isend_irecv(ops)
-            for req in reqs:
-                req.wait()
-    # To protect against race condition when using batch_isend_irecv().
-    torch.cuda.synchronize()
 
     # If using scatter-gather optimization, gather smaller chunks.
     if not override_scatter_gather_tensors_in_pipeline and \
