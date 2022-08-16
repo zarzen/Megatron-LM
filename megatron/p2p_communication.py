@@ -120,15 +120,18 @@ def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
                 tensor_recv_prev,
                 mpu.get_pipeline_model_parallel_prev_rank()
             )
+
+        if tensor_recv_next is not None:
+            torch.distributed.recv(tensor_recv_next, 
+                mpu.get_pipeline_model_parallel_next_rank())
+
         if tensor_send_next is not None:
             torch.distributed.send(
                 tensor_send_next,
                 mpu.get_pipeline_model_parallel_next_rank()
             )
 
-        if tensor_recv_next is not None:
-            torch.distributed.recv(tensor_recv_next, 
-                mpu.get_pipeline_model_parallel_next_rank())
+    # torch.cuda.synchronize()
 
     # If using scatter-gather optimization, gather smaller chunks.
     if not override_scatter_gather_tensors_in_pipeline and \
